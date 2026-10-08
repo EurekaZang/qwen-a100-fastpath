@@ -1,0 +1,17 @@
+#!/bin/bash
+# qwenctl start|stop|restart|status|logs [N]|key
+W=$(cd "$(dirname "$0")" && pwd); U=qwen38
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+case "$1" in
+  start)   systemd-run --user --unit=$U --collect \
+             --description="Qwen3.8-27B-Uncensored-INT8 (vLLM, Anthropic API, 127.0.0.1:8421)" \
+             -p Restart=on-failure -p RestartSec=20 -p StartLimitBurst=5 -p StartLimitIntervalSec=900 -p TimeoutStopSec=90 \
+             bash -c "exec $W/run_vllm.sh >> $W/logs/vllm.log 2>&1" ;;
+  stop)    systemctl --user stop $U ;;
+  restart) "$0" stop; sleep 4; "$0" start ;;
+  status)  systemctl --user status $U --no-pager 2>&1 | head -8
+           curl -s -m 3 -o /dev/null -w "health=%{http_code}\n" http://127.0.0.1:8421/health ;;
+  logs)    tail -n ${2:-60} $W/logs/vllm.log ;;
+  key)     sed 's/^QWEN_API_KEY=//' $W/serve.env ;;
+  *)       echo "usage: $0 start|stop|restart|status|logs [N]|key"; exit 1 ;;
+esac

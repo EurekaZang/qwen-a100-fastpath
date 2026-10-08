@@ -1,0 +1,15 @@
+.venv/
+_incoming/
+__pycache__/
+*.pyc
+report/_build*
+report/*.log
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.out
+bench/results.txt
+bench/cap*/
+serve.env
+api_key
+hf/

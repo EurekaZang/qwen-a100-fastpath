@@ -1,0 +1,228 @@
+#!/bin/bash
+# claude-qwen: run Claude Code against the self-hosted Qwen3.8-27B-Uncensored-INT8
+# (vLLM, Anthropic-compatible API on a remote GPU server, reached through an SSH jump host). Your normal `claude` is untouched:
+# everything below is set per process through environment variables only.
+#
+#   claude-qwen [claude args...]                 open the SSH tunnel if needed, run claude, close the tunnel with the last session
+#   claude-qwen --server status|start|stop|restart|logs [N]   manage the vLLM service on the server
+#   claude-qwen --tunnel up|down|status|log      manage the SSH tunnel by hand (log: recent reconnects)
+#   claude-qwen --help
+#
+# While any session is running, a watchdog checks the tunnel every few seconds and reopens it when it drops
+# (the jump host reaches UMD over Wi-Fi and loses its link many times a day). Reconnects go to ~/.config/claude-qwen/run/tunnel.log.
+#
+# Tunables (environment):
+#   CLAUDE_QWEN_COMPACT_PCT   auto-compact trigger, percent of (window - 20K) (default 75, i.e. ~83K tokens)
+#   CLAUDE_QWEN_CONTEXT       real context window of the server (default 131072; keep in sync with --max-model-len)
+#   CLAUDE_QWEN_PORT          local port (default 8421)
+#   CLAUDE_QWEN_PERMISSION_MODE   default bypassPermissions (no prompts!); use default|acceptEdits|plan to get prompts back
+set -u
+
+CFG="${CLAUDE_QWEN_HOME:-$HOME/.config/claude-qwen}"
+PORT="${CLAUDE_QWEN_PORT:-8421}"
+# loopback-only ports on the jump host; a reconnect moves to the next one, so a half-dead old forward that still
+# holds its port on the jump host cannot block the new tunnel
+JUMP_PORTS="${CLAUDE_QWEN_JUMP_PORTS:-18421 18422 18423}"
+MODEL="Qwen3.8-27B-Uncensored"
+CTX="${CLAUDE_QWEN_CONTEXT:-131072}"
+BASE="http://127.0.0.1:$PORT"
+KEYFILE="$CFG/api_key"
+RUN="$CFG/run"
+LOG="$RUN/tunnel.log"
+SERVER_DIR="${CLAUDE_QWEN_SERVER_DIR:-/opt/qwen-serve}"   # deployment directory on the GPU server
+# SSH: HOP is the local ssh alias that reaches the jump host; TARGET is the GPU server's alias *on the jump host*
+HOP="${CLAUDE_QWEN_SSH_HOP:-gpu-server}"
+TARGET="${CLAUDE_QWEN_SSH_TARGET:-gpu-server}"
+WATCH_EVERY=5                                  # seconds between watchdog checks
+# drop a dead connection within ~30 s instead of hanging on it
+KEEPALIVE="-o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o TCPKeepAlive=yes"
+
+die() { echo "claude-qwen: $*" >&2; exit 1; }
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >> "$LOG"; }
+mkdir -p "$RUN/clients"
+
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; }
+
+[ -r "$KEYFILE" ] || die "missing API key file: $KEYFILE (ask the server: claude-qwen --server key)"
+KEY=$(<"$KEYFILE")
+
+# GET with the key passed on stdin so it never appears on a command line
+api() { printf 'x-api-key: %s\n' "$KEY" | curl -s -m 5 -H @- "$BASE$1"; }
+healthy() { api /v1/models 2>/dev/null | grep -q "\"$MODEL\""; }
+
+tunnel_pid() { [ -f "$RUN/tunnel.pid" ] && kill -0 "$(cat "$RUN/tunnel.pid")" 2>/dev/null && cat "$RUN/tunnel.pid"; }
+
+next_jump_port() {  # rotate through JUMP_PORTS, one step per (re)connect
+  local ports i n
+  ports=($JUMP_PORTS); n=${#ports[@]}
+  i=$(cat "$RUN/jump_port_idx" 2>/dev/null || echo -1)
+  case "$i" in ''|*[!0-9-]*) i=-1 ;; esac
+  i=$(( (i + 1) % n )); echo "$i" > "$RUN/jump_port_idx"
+  echo "${ports[$i]}"
+}
+
+tunnel_start() {  # 0: started (or already running), 1: local port taken by something else
+  local jp
+  [ -n "$(tunnel_pid)" ] && return 0
+  if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "claude-qwen: local port $PORT is already in use by something that is not the Qwen server" >&2
+    return 1
+  fi
+  jp=$(next_jump_port)
+  # outer ssh holds a pty so the inner ssh (on the jump host) dies when this connection drops
+  ssh -tt -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes $KEEPALIVE \
+    -o "RemoteCommand=ssh -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes $KEEPALIVE -N -L 127.0.0.1:$jp:127.0.0.1:8421 $TARGET" \
+    -L "127.0.0.1:$PORT:127.0.0.1:$jp" "$HOP" </dev/null >/dev/null 2>&1 &
+  echo $! > "$RUN/tunnel.pid"
+  log "tunnel started pid=$! via jump port $jp"
+  return 0
+}
+
+tunnel_stop() {
+  local p; p=$(tunnel_pid) && { kill "$p" 2>/dev/null; log "tunnel stopped pid=$p"; }
+  rm -f "$RUN/tunnel.pid"
+}
+
+tunnel_up() {
+  healthy && return 0
+  echo "claude-qwen: opening SSH tunnel to $TARGET ..." >&2
+  tunnel_start || return 3
+  local i
+  for i in $(seq 1 45); do
+    healthy && return 0
+    [ -n "$(tunnel_pid)" ] || { tunnel_start || return 3; }   # ssh exited (e.g. jump port busy): next port
+    sleep 1
+  done
+  [ -n "$(tunnel_pid)" ] || return 2   # tunnel itself keeps failing
+  return 1                             # tunnel is up but the server does not answer
+}
+
+live_clients() {  # prune sessions that died without cleaning up; true if any remain
+  local f
+  for f in "$RUN"/clients/*; do
+    [ -e "$f" ] || continue
+    kill -0 "$(basename "$f")" 2>/dev/null || rm -f "$f"
+  done
+  [ -n "$(ls -A "$RUN/clients" 2>/dev/null)" ]
+}
+
+reconnect() {  # one process at a time (mkdir is atomic); the lock records its holder so a dead holder is ignored
+  local L="$RUN/reconnect.lock"
+  if ! mkdir "$L" 2>/dev/null; then
+    kill -0 "$(cat "$L/pid" 2>/dev/null)" 2>/dev/null && return 0
+    rm -rf "$L"; mkdir "$L" 2>/dev/null || return 0
+  fi
+  echo $$ > "$L/pid"
+  if [ -z "$(tunnel_pid)" ] && live_clients; then
+    log "tunnel down while sessions are running: reconnecting"
+    tunnel_start
+    sleep 3
+  fi
+  rm -rf "$L"
+}
+
+watch_tunnel() {  # keep the tunnel up while any session runs; close it once the last session is gone
+  while live_clients; do
+    [ -z "$(tunnel_pid)" ] && reconnect
+    sleep "$WATCH_EVERY"
+  done
+  tunnel_stop
+}
+
+start_watcher() {  # detached watchdog for sessions that have none (e.g. sessions started by an older version)
+  nohup "$0" --watch >/dev/null 2>&1 &
+}
+
+remote() {  # run qwenctl on the GPU server (via the jump host)
+  ssh -o RequestTTY=no -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ConnectTimeout=20 \
+    -o "RemoteCommand=ssh -o BatchMode=yes $TARGET $SERVER_DIR/qwenctl $*" "$HOP"
+}
+
+cleanup() {  # last session out closes the tunnel (only a tunnel this launcher opened)
+  [ -n "${WATCHER:-}" ] && kill "$WATCHER" 2>/dev/null
+  rm -f "$RUN/clients/$$"
+  live_clients || tunnel_stop
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+  --watch) watch_tunnel; exit 0 ;;
+  --server)
+    shift; [ $# -ge 1 ] || die "usage: claude-qwen --server status|start|stop|restart|logs [N]|key"
+    remote "$@"; exit $? ;;
+  --tunnel)
+    case "${2:-status}" in
+      up)     if tunnel_up; then
+                echo "tunnel up, server healthy at $BASE"
+                live_clients && start_watcher     # running sessions get a watchdog
+              else
+                die "could not reach the server (try: claude-qwen --server status)"
+              fi ;;
+      down)   tunnel_stop; echo "tunnel closed" ;;
+      status) healthy && echo "server reachable at $BASE" || echo "server not reachable at $BASE (tunnel pid: $(tunnel_pid || echo none))" ;;
+      log)    tail -n "${3:-20}" "$LOG" 2>/dev/null || echo "no tunnel log yet" ;;
+      *) die "usage: claude-qwen --tunnel up|down|status|log" ;;
+    esac; exit 0 ;;
+esac
+
+# register this session first, so the cleanup trap and the watchdog know about it
+echo $$ > "$RUN/clients/$$"
+trap cleanup EXIT
+tunnel_up; rc=$?
+if [ $rc -eq 3 ]; then die "local port $PORT is taken by another program"; fi
+if [ $rc -eq 2 ]; then die "the SSH tunnel failed to start (check that 'ssh $HOP' works and ports $JUMP_PORTS are free on the jump host)"; fi
+if [ $rc -ne 0 ]; then
+  die "tunnel is up but the Qwen server is not answering. Start it with: claude-qwen --server start   (first start takes ~6 min)"
+fi
+( trap - EXIT INT TERM HUP; watch_tunnel ) </dev/null >/dev/null 2>&1 &
+WATCHER=$!
+
+# ---- permission mode ------------------------------------------------------------------------
+# Default for this launcher only (your normal `claude` is unaffected); an explicit permission flag on the command line
+# always wins. ${EXTRA[@]+...} keeps bash 3.2 (macOS /bin/bash) happy under `set -u` when the array is empty.
+MODE="${CLAUDE_QWEN_PERMISSION_MODE:-bypassPermissions}"
+EXTRA=()
+case " $* " in
+  *" --permission-mode"*|*" --dangerously-skip-permissions"*|*" --allow-dangerously-skip-permissions"*) ;;
+  *) [ "$MODE" != "default" ] && EXTRA=(--permission-mode "$MODE") ;;
+esac
+NONDEFAULT=0     # any permission mode other than "default", from our default or from an explicit flag
+[ ${#EXTRA[@]} -gt 0 ] && NONDEFAULT=1
+case " $* " in *" --permission-mode"*|*" --dangerously-skip-permissions"*|*" --allow-dangerously-skip-permissions"*) NONDEFAULT=1 ;; esac
+
+# ---- per-process Claude Code configuration -------------------------------------------------
+export ANTHROPIC_BASE_URL="$BASE"
+export ANTHROPIC_AUTH_TOKEN="$KEY"          # Bearer: highest precedence, never falls back to the claude.ai login
+unset ANTHROPIC_API_KEY CLAUDE_CODE_OAUTH_TOKEN CLAUDE_CODE_USE_BEDROCK CLAUDE_CODE_USE_VERTEX
+
+# model routing: every alias, subagent and background call goes to the one local model
+export ANTHROPIC_MODEL="$MODEL"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="$MODEL" ANTHROPIC_DEFAULT_SONNET_MODEL="$MODEL" ANTHROPIC_DEFAULT_HAIKU_MODEL="$MODEL"
+export CLAUDE_CODE_SUBAGENT_MODEL="$MODEL"
+export ANTHROPIC_CUSTOM_MODEL_OPTION="$MODEL"
+export ANTHROPIC_CUSTOM_MODEL_OPTION_NAME="Qwen3.8 27B (local A100)"
+export ANTHROPIC_CUSTOM_MODEL_OPTION_DESCRIPTION="Self-hosted vLLM, INT8 + MTP, ${CTX} ctx"
+
+# context window + auto-compaction: Claude Code assumes a window for unknown model ids, so declare the real one
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="$CTX"
+export CLAUDE_CODE_DISABLE_1M_CONTEXT=1     # the account has 1M-context entitlements; never apply a [1m] window to this model
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW="$CTX"
+# Compact at PCT% of (window - 20K reserved for the summary): 75% of 111,072 ~= 83K tokens. Claude Code's own default
+# (~98K) plus its 32K max_tokens would run into the 131,072 hard limit; measured: 30% triggered at ~34K and kept all facts.
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="${CLAUDE_QWEN_COMPACT_PCT:-75}"
+
+# keep the request prefix byte-stable so vLLM's prefix cache hits (the billing header changes every request)
+export CLAUDE_CODE_ATTRIBUTION_HEADER=0
+
+# local-only session: no telemetry/feature-flag traffic, tolerate a slow model, don't leak the key to tool subprocesses
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+export API_TIMEOUT_MS=1800000
+# Claude Code forces ANY non-default permission mode (bypassPermissions, acceptEdits, plan) back to "default" while
+# subprocess env scrubbing is on. So scrub (hide the key from tool subprocesses) only in plain default mode. Under
+# bypassPermissions the model could read the key file anyway, so the scrub would not be a real boundary there.
+if [ "$NONDEFAULT" = 1 ]; then export CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0; else export CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1; fi
+
+trap ':' INT                 # Ctrl-C is for claude, not for this wrapper (a no-op handler is not inherited by the child)
+trap 'exit 143' TERM HUP
+claude ${EXTRA[@]+"${EXTRA[@]}"} "$@"
+exit $?

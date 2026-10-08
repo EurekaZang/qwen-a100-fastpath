@@ -1,0 +1,156 @@
+=== triton [17:25:32] env:  args: --attention-backend TRITON_ATTN
+  up after 255s; gpu: 1634543, 420 MiB 617521, 57148 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7085 without CUDA graph memory profiling.
+  log: GPU KV cache size: 352,256 tokens, Maximum concurrency for 131,072 tokens per request: 2.69x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  decode story: 69.6 tok/s  accept_len=2.0  runs=[70.9, 68.3]
+  decode code : 93.9 tok/s  accept_len=2.7  runs=[92.6, 95.2]
+  decode zh   : 70.7 tok/s  accept_len=2.03  runs=[68.2, 73.1]
+  long-ctx 37932 tok: TTFT 14.15s decode 28.7 tok/s
+  long-ctx 37932 tok: TTFT 1.06s decode 27.7 tok/s
+  done [17:32:00]
+=== flashinfer [17:32:06] env:  args: --attention-backend FLASHINFER
+  up after 300s; gpu: 1634543, 420 MiB 627143, 58904 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7057 without CUDA graph memory profiling.
+  log: CUDAGraphMode.FULL_AND_PIECEWISE is not supported with spec-decode for attention backend FlashInferBackend (support: AttentionCGSupport.UNIFORM_SINGLE_TOKEN_DECODE); setting cudagraph_mode=PIEC
+  log: GPU KV cache size: 349,277 tokens, Maximum concurrency for 131,072 tokens per request: 2.66x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  decode story: 48.1 tok/s  accept_len=2.0  runs=[43.3, 52.8]
+  decode code : 61.5 tok/s  accept_len=2.68  runs=[67.8, 55.2]
+  decode zh   : 49.8 tok/s  accept_len=2.0  runs=[51.4, 48.3]
+  long-ctx 37932 tok: TTFT 8.32s decode 38.2 tok/s
+  long-ctx 37932 tok: TTFT 0.74s decode 49.0 tok/s
+  done [17:39:38]
+=== fast1 [18:18:41] env: VLLM_CACHE_ROOT=$QWEN_HOME/vllm-cache-fp args: 
+  up after 175s; gpu: 1634543, 420 MiB 666270, 57076 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7033 without CUDA graph memory profiling.
+  log: GPU KV cache size: 346,298 tokens, Maximum concurrency for 131,072 tokens per request: 2.64x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 69.9 tok/s  accept_len=1.99  runs=[69.7, 70.1]
+  decode code : 94.2 tok/s  accept_len=2.68  runs=[96.0, 92.5]
+  decode zh   : 71.2 tok/s  accept_len=2.03  runs=[71.4, 70.9]
+  prefill   1929 tok uncached: TTFT 0.60s -> 3233 tok/s
+  prefill   7587 tok uncached: TTFT 1.32s -> 5751 tok/s
+  prefill  22726 tok uncached: TTFT 4.47s -> 5084 tok/s
+  long-ctx 37932 tok: TTFT 8.36s decode 67.3 tok/s
+  long-ctx 37932 tok: TTFT 0.68s decode 67.9 tok/s
+  replay 0001.json: in=15655 TTFT=2.94s prefix-hit=0%
+  replay 0002.json: in=17033 TTFT=0.71s prefix-hit=85%
+  replay 0003.json: in=17475 TTFT=0.49s prefix-hit=92%
+  replay 0004.json: in=17608 TTFT=0.56s prefix-hit=91%
+  replay 0005.json: in=18382 TTFT=0.49s prefix-hit=91%
+  replay 0006.json: in=19306 TTFT=0.69s prefix-hit=87%
+  replay 0007.json: in=19991 TTFT=0.52s prefix-hit=92%
+  replay total TTFT 6.40s; overall hit 78%
+  done [18:23:32]
+=== fast2 [18:24:12] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp args: 
+  up after 260s; gpu: 1634543, 420 MiB 669834, 57100 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7032 without CUDA graph memory profiling.
+  log: GPU KV cache size: 346,298 tokens, Maximum concurrency for 131,072 tokens per request: 2.64x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 76.8 tok/s  accept_len=2.04  runs=[76.2, 77.3]
+  decode code : 100.9 tok/s  accept_len=2.69  runs=[100.4, 101.5]
+  decode zh   : 76.7 tok/s  accept_len=2.05  runs=[77.7, 75.6]
+  prefill   1929 tok uncached: TTFT 0.42s -> 4624 tok/s
+  prefill   7588 tok uncached: TTFT 1.36s -> 5591 tok/s
+  prefill  22726 tok uncached: TTFT 4.49s -> 5061 tok/s
+  long-ctx 37932 tok: TTFT 8.30s decode 70.5 tok/s
+  long-ctx 37932 tok: TTFT 0.58s decode 69.0 tok/s
+  done [18:30:16]
+=== fast3k2 [18:31:16] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 args: 
+  up after 260s; gpu: 1634543, 420 MiB 672334, 57092 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.7032 without CUDA graph memory profiling.
+  log: GPU KV cache size: 329,169 tokens, Maximum concurrency for 131,072 tokens per request: 2.51x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 74.9 tok/s  accept_len=1.99  runs=[75.5, 74.4]
+  decode code : 99.4 tok/s  accept_len=2.65  runs=[98.7, 100.1]
+  decode zh   : 76.3 tok/s  accept_len=2.04  runs=[74.5, 78.1]
+  long-ctx 37932 tok: TTFT 8.34s decode 71.7 tok/s
+  long-ctx 37932 tok: TTFT 0.57s decode 70.1 tok/s
+  done [18:37:15]
+=== fast3k3 [18:37:20] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=3 args: 
+  up after 250s; gpu: 1634543, 420 MiB 674291, 57102 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6998 without CUDA graph memory profiling.
+  log: GPU KV cache size: 319,991 tokens, Maximum concurrency for 131,072 tokens per request: 2.44x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 73.0 tok/s  accept_len=2.12  runs=[72.6, 73.4]
+  decode code : 115.4 tok/s  accept_len=3.36  runs=[114.8, 115.9]
+  decode zh   : 77.1 tok/s  accept_len=2.25  runs=[76.8, 77.4]
+  long-ctx 37932 tok: TTFT 8.33s decode 71.3 tok/s
+  long-ctx 37932 tok: TTFT 0.54s decode 72.5 tok/s
+  done [18:43:06]
+=== fast3k4 [18:43:12] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=4 args: 
+  up after 270s; gpu: 1634543, 420 MiB 676283, 57056 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6971 without CUDA graph memory profiling.
+  log: GPU KV cache size: 310,472 tokens, Maximum concurrency for 131,072 tokens per request: 2.37x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 73.5 tok/s  accept_len=2.32  runs=[75.2, 71.8]
+  decode code : 115.8 tok/s  accept_len=3.67  runs=[113.6, 118.0]
+  decode zh   : 72.3 tok/s  accept_len=2.3  runs=[73.5, 71.1]
+  long-ctx 37932 tok: TTFT 8.34s decode 66.8 tok/s
+  long-ctx 37932 tok: TTFT 0.61s decode 67.2 tok/s
+  done [18:49:20]
+=== fast4k3 [18:49:36] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=3 args: 
+  up after 235s; gpu: 1634543, 420 MiB 678978, 57104 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6998 without CUDA graph memory profiling.
+  log: GPU KV cache size: 319,991 tokens, Maximum concurrency for 131,072 tokens per request: 2.44x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 63.6 tok/s  accept_len=2.1  runs=[62.3, 64.9]
+  decode code : 118.8 tok/s  accept_len=3.4  runs=[117.9, 119.6]
+  decode zh   : 83.0 tok/s  accept_len=2.33  runs=[82.0, 84.0]
+  long-ctx 37932 tok: TTFT 8.78s decode 81.9 tok/s
+  long-ctx 37932 tok: TTFT 0.58s decode 70.8 tok/s
+  done [18:55:08]
+=== fast4k4 [18:55:13] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=4 args: 
+  up after 240s; gpu: 1634543, 420 MiB 682953, 58152 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6971 without CUDA graph memory profiling.
+  log: GPU KV cache size: 325,117 tokens, Maximum concurrency for 131,072 tokens per request: 2.48x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 77.6 tok/s  accept_len=2.27  runs=[75.8, 79.4]
+  decode code : 125.5 tok/s  accept_len=3.72  runs=[123.1, 127.9]
+  decode zh   : 82.9 tok/s  accept_len=2.4  runs=[83.8, 82.1]
+  long-ctx 37932 tok: TTFT 8.29s decode 76.3 tok/s
+  long-ctx 37932 tok: TTFT 0.65s decode 72.5 tok/s
+  done [19:00:44]
+=== fast4k3p [19:00:53] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=3 SPEC_EXTRA="draft_sample_method":"probabilistic" args: 
+  up after 285s; gpu: 1634543, 420 MiB 687321, 2096 MiB 687475, 2092 MiB 687594, 2092 MiB 687602, 50214 MiB 687952, 2232 MiB 688008, 2242 MiB 688239, 2242 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6998 without CUDA graph memory profiling.
+  log: GPU KV cache size: 226,263 tokens, Maximum concurrency for 131,072 tokens per request: 1.73x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 12.2 tok/s  accept_len=2.35  runs=[12.4, 12.0]
+  decode code : 18.3 tok/s  accept_len=3.49  runs=[18.6, 17.9]
+  decode zh   : 12.6 tok/s  accept_len=2.44  runs=[13.1, 12.1]
+  long-ctx 37932 tok: TTFT 41.33s decode 11.1 tok/s
+  long-ctx 37932 tok: TTFT 1.91s decode 12.1 tok/s
+  done [19:15:15]
+=== fast4k4p [19:15:20] env: CACHE_ROOT=$QWEN_HOME/vllm-cache-fp2 SPEC=4 SPEC_EXTRA="draft_sample_method":"probabilistic" args: 
+  up after 310s; gpu: 1634543, 420 MiB 687321, 2096 MiB 687475, 2092 MiB 687594, 2092 MiB 687952, 2232 MiB 688008, 2242 MiB 688239, 2242 MiB 693130, 57068 MiB 
+  log: CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7200 is equivalent to --gpu-memory-utilization=0.6971 without CUDA graph memory profiling.
+  log: GPU KV cache size: 309,739 tokens, Maximum concurrency for 131,072 tokens per request: 2.36x
+  log: Initializing a V1 LLM engine (v0.31.0) with config: model='$QWEN_HOME/model', speculative_config=SpeculativeConfig(method='mtp', model='$QWEN_HOME/model', num_sp
+  log: Selected CutlassInt8ScaledMMLinearKernel for CompressedTensorsW8A8Int8
+  log: Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].
+  decode story: 11.4 tok/s  accept_len=2.48  runs=[11.2, 11.6]
+  decode code : 18.4 tok/s  accept_len=3.99  runs=[18.3, 18.5]
+  decode zh   : 12.2 tok/s  accept_len=2.67  runs=[12.3, 12.1]
+  long-ctx 37932 tok: TTFT 44.45s decode 10.5 tok/s
+  long-ctx 37932 tok: TTFT 2.23s decode 10.4 tok/s
+  done [19:30:37]

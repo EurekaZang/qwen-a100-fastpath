@@ -1,0 +1,723 @@
+{
+ "_about": "Every number in the report, as measured on one NVIDIA A100 80GB PCIe (vLLM 0.31.0, torch 2.13, CUDA 13.0) on 2026-10-06/07. 'idle' = no other process using the GPU's SMs; 'contended' = co-tenant jobs time-slicing the GPU. Decode rates are tok/s over a 1024-token (600 for long) completion, mean of 2 runs, single stream, thinking disabled, default sampling (temperature 1.0, top_p 0.95, top_k 20). accept_len = 1 + accepted draft tokens per verification step (vLLM spec-decode metrics). Raw log of the configuration sweep: data/experiment_log.txt.",
+ "model": {
+  "name": "Qwen3.8-27B (W8A8-INT8, compressed-tensors)",
+  "layers": 64,
+  "full_attention_layers": 16,
+  "gated_deltanet_layers": 48,
+  "hidden": 5120,
+  "intermediate": 17408,
+  "q_heads": 24,
+  "kv_heads": 4,
+  "head_dim": 256,
+  "vocab": 248320,
+  "mtp_layers": 1,
+  "max_position": 262144,
+  "served_context": 131072,
+  "weights_gib": 29.39,
+  "kv_bytes_per_token_full_attn_layer": 4096
+ },
+ "hardware": {
+  "gpu": "NVIDIA A100 80GB PCIe",
+  "copy_bandwidth_gbs": 1671,
+  "lm_head_gemv_gbs": 1702,
+  "sm_clock_mhz": 1410
+ },
+ "configs": {
+  "baseline": {
+   "label": "Stock vLLM (FA2 + CUTLASS W8A8), MTP k=2 greedy",
+   "env": "idle"
+  },
+  "triton_attn": {
+   "label": "Baseline, --attention-backend TRITON_ATTN",
+   "env": "idle"
+  },
+  "flashinfer_attn": {
+   "label": "Baseline, --attention-backend FLASHINFER (falls back to piecewise CUDA graphs)",
+   "env": "idle"
+  },
+  "attn_only": {
+   "label": "+ split-KV GQA-packed attention (stale compile cache: W8A16 op not in the graph)",
+   "env": "idle"
+  },
+  "attn_linear_k2": {
+   "label": "+ attention + W8A16 decode GEMM, k=2",
+   "env": "idle"
+  },
+  "greedy_k3_bf16head": {
+   "label": "attention + W8A16, k=3 greedy, bf16 draft head",
+   "env": "idle"
+  },
+  "greedy_k4_bf16head": {
+   "label": "attention + W8A16, k=4 greedy, bf16 draft head",
+   "env": "idle"
+  },
+  "greedy_k3": {
+   "label": "all three patches, k=3 greedy",
+   "env": "idle"
+  },
+  "greedy_k4": {
+   "label": "all three patches, k=4 greedy",
+   "env": "idle"
+  },
+  "prob_k3": {
+   "label": "all three patches, k=3 probabilistic drafting",
+   "env": "contended (6 co-tenant processes)"
+  },
+  "prob_k4": {
+   "label": "all three patches, k=4 probabilistic drafting (production)",
+   "env": "contended (6 co-tenant processes)"
+  }
+ },
+ "decode": {
+  "baseline": {
+   "story": 69.8,
+   "code": 96.4,
+   "zh": 69.1,
+   "long_cold": 35.3,
+   "long_warm": 34.6,
+   "acc": {
+    "story": 2.0,
+    "code": 2.76,
+    "zh": 1.98
+   }
+  },
+  "triton_attn": {
+   "story": 69.6,
+   "code": 93.9,
+   "zh": 70.7,
+   "long_cold": 28.7,
+   "long_warm": 27.7,
+   "acc": {
+    "story": 2.0,
+    "code": 2.7,
+    "zh": 2.03
+   }
+  },
+  "flashinfer_attn": {
+   "story": 48.1,
+   "code": 61.5,
+   "zh": 49.8,
+   "long_cold": 38.2,
+   "long_warm": 49.0,
+   "acc": {
+    "story": 2.0,
+    "code": 2.68,
+    "zh": 2.0
+   }
+  },
+  "attn_only": {
+   "story": 69.9,
+   "code": 94.2,
+   "zh": 71.2,
+   "long_cold": 67.3,
+   "long_warm": 67.9,
+   "acc": {
+    "story": 1.99,
+    "code": 2.68,
+    "zh": 2.03
+   }
+  },
+  "attn_linear_k2": {
+   "story": 76.8,
+   "code": 100.9,
+   "zh": 76.7,
+   "long_cold": 70.5,
+   "long_warm": 69.0,
+   "acc": {
+    "story": 2.04,
+    "code": 2.69,
+    "zh": 2.05
+   }
+  },
+  "greedy_k3_bf16head": {
+   "story": 73.0,
+   "code": 115.4,
+   "zh": 77.1,
+   "long_cold": 71.3,
+   "long_warm": 72.5,
+   "acc": {
+    "story": 2.12,
+    "code": 3.36,
+    "zh": 2.25
+   }
+  },
+  "greedy_k4_bf16head": {
+   "story": 73.5,
+   "code": 115.8,
+   "zh": 72.3,
+   "long_cold": 66.8,
+   "long_warm": 67.2,
+   "acc": {
+    "story": 2.32,
+    "code": 3.67,
+    "zh": 2.3
+   }
+  },
+  "greedy_k3": {
+   "story": 63.6,
+   "code": 118.8,
+   "zh": 83.0,
+   "long_cold": 81.9,
+   "long_warm": 70.8,
+   "acc": {
+    "story": 2.1,
+    "code": 3.4,
+    "zh": 2.33
+   }
+  },
+  "greedy_k4": {
+   "story": 77.6,
+   "code": 125.5,
+   "zh": 82.9,
+   "long_cold": 76.3,
+   "long_warm": 72.5,
+   "acc": {
+    "story": 2.27,
+    "code": 3.72,
+    "zh": 2.4
+   }
+  },
+  "prob_k3": {
+   "story": 12.2,
+   "code": 18.3,
+   "zh": 12.6,
+   "long_cold": 11.1,
+   "long_warm": 12.1,
+   "acc": {
+    "story": 2.35,
+    "code": 3.49,
+    "zh": 2.44
+   }
+  },
+  "prob_k4": {
+   "story": 11.4,
+   "code": 18.4,
+   "zh": 12.2,
+   "long_cold": 10.5,
+   "long_warm": 10.4,
+   "acc": {
+    "story": 2.48,
+    "code": 3.99,
+    "zh": 2.67
+   }
+  }
+ },
+ "prefill_uncached": {
+  "_note": "TTFT of a fresh prompt (nonce-prefixed), max_tokens=1; tok/s = prompt tokens / TTFT",
+  "baseline": [
+   [
+    1929,
+    0.44,
+    4344
+   ],
+   [
+    7588,
+    1.38,
+    5504
+   ],
+   [
+    22726,
+    4.55,
+    4994
+   ],
+   [
+    37932,
+    8.38,
+    4527
+   ]
+  ],
+  "attn_linear_k2": [
+   [
+    1929,
+    0.42,
+    4624
+   ],
+   [
+    7588,
+    1.36,
+    5591
+   ],
+   [
+    22726,
+    4.49,
+    5061
+   ],
+   [
+    37932,
+    8.3,
+    4570
+   ]
+  ],
+  "triton_attn_long_cold_ttft_s": 14.15,
+  "contended_long_cold_ttft_s": 41.33
+ },
+ "first_deployment_k_sweep": {
+  "_note": "2026-10-06, GPU time-shared with a co-tenant training job; story/code = single-stream tok/s, agg8 = aggregate tok/s with 8 concurrent streams",
+  "k": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "story": [
+   22.7,
+   30.8,
+   33.8,
+   34.4
+  ],
+  "code": [
+   22.1,
+   35.6,
+   45.8,
+   51.5
+  ],
+  "agg8": [
+   161,
+   211,
+   218,
+   160
+  ]
+ },
+ "nsys_38k_decode": {
+  "_note": "Nsight Systems, CUDA-graph node tracing, 1.5 s window of baseline decode at 37,932 context tokens (MTP k=2): 26 verification steps. ms = total over the window.",
+  "steps": 26,
+  "kernels_ms": {
+   "FlashAttention-2 split-KV (full-attention layers)": 793.8,
+   "CUTLASS W8A8 int8 GEMM": 491.6,
+   "bf16 GEMM (lm_head, MTP head)": 145.9,
+   "dynamic int8 activation quant": 23.8,
+   "other (GDN, norms, RoPE, sampling, ...)": 80.2
+  },
+  "flash_attn_avg_us": 1752.3,
+  "flash_attn_instances": 453,
+  "short_ctx_step_ms": 28.5
+ },
+ "linear_kernels": {
+  "_note": "One GEMM, CUDA-graph replay, best of 5; weights int8 (per-channel), K-major as stored by vLLM. ours_w8a16 measured in a separate run with its own CUTLASS reference (cutlass_ref). gdn.out and attn.o share one deployed configuration (TUNED in plugin/qwen_fastpath/w8a16.py), so both use its measured 24.0 us.",
+  "shapes": {
+   "mlp.gate_up": {
+    "N": 34816,
+    "K": 5120,
+    "count": 64
+   },
+   "mlp.down": {
+    "N": 5120,
+    "K": 17408,
+    "count": 64
+   },
+   "gdn.in_qkvz": {
+    "N": 16384,
+    "K": 5120,
+    "count": 48
+   },
+   "gdn.out": {
+    "N": 5120,
+    "K": 6144,
+    "count": 48
+   },
+   "attn.qkv": {
+    "N": 14336,
+    "K": 5120,
+    "count": 16
+   },
+   "attn.o": {
+    "N": 5120,
+    "K": 6144,
+    "count": 16
+   }
+  },
+  "us_M3": {
+   "bf16_cublas": {
+    "mlp.gate_up": 220.8,
+    "mlp.down": 115.8,
+    "gdn.in_qkvz": 115.3,
+    "gdn.out": 44.2,
+    "attn.qkv": 106.3,
+    "attn.o": 44.2
+   },
+   "cutlass_w8a8": {
+    "mlp.gate_up": 145.3,
+    "mlp.down": 70.2,
+    "gdn.in_qkvz": 70.2,
+    "gdn.out": 26.0,
+    "attn.qkv": 63.7,
+    "attn.o": 27.2
+   },
+   "triton_w8a8": {
+    "mlp.gate_up": 121.5,
+    "mlp.down": 70.0,
+    "gdn.in_qkvz": 73.8,
+    "gdn.out": 26.5,
+    "attn.qkv": 71.9,
+    "attn.o": 26.9
+   },
+   "marlin_w8a16": {
+    "mlp.gate_up": 120.3,
+    "mlp.down": 63.5,
+    "gdn.in_qkvz": 60.9,
+    "gdn.out": 18.9,
+    "attn.qkv": 54.4,
+    "attn.o": 18.7
+   },
+   "ours_w8a16": {
+    "mlp.gate_up": 119.7,
+    "mlp.down": 64.4,
+    "gdn.in_qkvz": 59.5,
+    "gdn.out": 24.0,
+    "attn.qkv": 54.9,
+    "attn.o": 24.0
+   },
+   "cutlass_ref": {
+    "mlp.gate_up": 138.3,
+    "mlp.down": 73.6,
+    "gdn.in_qkvz": 69.7,
+    "gdn.out": 27.1,
+    "attn.qkv": 64.2,
+    "attn.o": 27.1
+   }
+  },
+  "us_M2048": {
+   "bf16_cublas": {
+    "mlp.gate_up": 3007.5,
+    "mlp.down": 1427.0,
+    "gdn.in_qkvz": 1493.1,
+    "gdn.out": 494.8,
+    "attn.qkv": 1335.0,
+    "attn.o": 494.4
+   },
+   "cutlass_w8a8": {
+    "mlp.gate_up": 1626.2,
+    "mlp.down": 822.7,
+    "gdn.in_qkvz": 764.9,
+    "gdn.out": 295.6,
+    "attn.qkv": 678.2,
+    "attn.o": 302.1
+   },
+   "triton_w8a8": {
+    "mlp.gate_up": 2230.1,
+    "mlp.down": 1043.3,
+    "gdn.in_qkvz": 1057.6,
+    "gdn.out": 376.4,
+    "attn.qkv": 922.8,
+    "attn.o": 370.5
+   },
+   "marlin_w8a16": {
+    "mlp.gate_up": 4703.5,
+    "mlp.down": 2209.6,
+    "gdn.in_qkvz": 2147.7,
+    "gdn.out": 783.6,
+    "attn.qkv": 1826.6,
+    "attn.o": 793.5
+   }
+  },
+  "lm_head_int8_M3": {
+   "cutlass_w8a8": 937.4,
+   "ours_w8a16": 782.6
+  },
+  "lm_head_bf16_M1_us": 1493.8,
+  "rel_error_M1": {
+   "w8a8_cutlass": {
+    "mlp.gate_up": 0.0086,
+    "mlp.down": 0.0085,
+    "gdn.in_qkvz": 0.0094,
+    "gdn.out": 0.0088,
+    "attn.qkv": 0.0086,
+    "attn.o": 0.0083,
+    "lm_head": 0.0087
+   },
+   "w8a16_ours": {
+    "mlp.gate_up": 0.0017,
+    "mlp.down": 0.0017,
+    "gdn.in_qkvz": 0.0017,
+    "gdn.out": 0.0017,
+    "attn.qkv": 0.0016,
+    "attn.o": 0.0017,
+    "lm_head": 0.0017
+   }
+  }
+ },
+ "attention_kernel": {
+  "_note": "Per full-attention layer, one request (B=1) unless noted, Q = query tokens per request; paged KV (800-token pages, shuffled); CUDA-graph replay; error = relative L2 vs fp32 reference.",
+  "ctx": [
+   0,
+   1,
+   2,
+   50,
+   1000,
+   8000,
+   38000,
+   100000
+  ],
+  "fa2_Q3": [
+   7.8,
+   7.8,
+   7.8,
+   8.0,
+   52.5,
+   376.4,
+   1750.8,
+   4589.5
+  ],
+  "ours_Q3": [
+   7.2,
+   12.2,
+   12.2,
+   14.9,
+   23.9,
+   41.6,
+   126.2,
+   294.1
+  ],
+  "fa2_Q4": [
+   8.3,
+   7.7,
+   7.8,
+   8.0,
+   52.5,
+   376.6,
+   1753.3,
+   4588.7
+  ],
+  "ours_Q4": [
+   7.0,
+   12.7,
+   12.6,
+   15.3,
+   24.4,
+   43.8,
+   129.1,
+   294.7
+  ],
+  "fa2_Q3_B2": [
+   7.8,
+   7.8,
+   7.8,
+   8.1,
+   52.7,
+   376.2,
+   1749.6,
+   4600.8
+  ],
+  "ours_Q3_B2": [
+   8.7,
+   12.9,
+   12.9,
+   16.2,
+   26.5,
+   70.2,
+   236.1,
+   565.5
+  ],
+  "err_fa2": 0.0023,
+  "err_ours": 0.0022,
+  "fa2_kvcache_split_38k_us": {
+   "unpacked_eager": 500.6,
+   "gqa_packed_eager": 188.3
+  },
+  "tuned": {
+   "num_splits": 64,
+   "min_chunk": 128,
+   "block_n": 32,
+   "num_warps": 4,
+   "num_stages": 2,
+   "combine_warps": 2
+  }
+ },
+ "agent_session": {
+  "_note": "Replayed Claude Code agent loop: ~41K-token conversation (system + 20 tools + a large file read), 6 further tool-call steps each appending a tool result and an inline system reminder. max_tokens=1, so time = prefill. Measured while the GPU was contended, identically for both arms.",
+  "steps": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6
+  ],
+  "merged_ttft_s": [
+   48.57,
+   50.41,
+   38.57,
+   40.32,
+   42.26,
+   43.59,
+   45.24
+  ],
+  "merged_hit": [
+   0.0,
+   0.0,
+   0.34,
+   0.33,
+   0.32,
+   0.32,
+   0.31
+  ],
+  "inline_ttft_s": [
+   49.05,
+   4.89,
+   4.12,
+   4.67,
+   4.01,
+   4.53,
+   5.12
+  ],
+  "inline_hit": [
+   0.0,
+   0.94,
+   0.95,
+   0.94,
+   0.96,
+   0.95,
+   0.94
+  ],
+  "tokens_inline": [
+   40729,
+   41864,
+   42999,
+   44134,
+   45269,
+   46404,
+   47539
+  ],
+  "attribution_header_hit_rate": {
+   "before": 0.0,
+   "after": 0.68
+  },
+  "shared_system_prompt_probe": {
+   "tokens": 19270,
+   "first_ttft_s": 19.96,
+   "next_ttft_s": 1.9,
+   "hit_tokens": 17952
+  }
+ },
+ "contention": {
+  "_note": "Same production build; idle numbers from greedy k=4 (same patches), contended from probabilistic k=4 with six co-tenant processes time-slicing the GPU",
+  "idle": {
+   "story": 77.6,
+   "code": 125.5,
+   "zh": 82.9,
+   "long": 76.3
+  },
+  "contended": {
+   "story": 11.4,
+   "code": 18.4,
+   "zh": 12.2,
+   "long": 10.5
+  }
+ },
+ "memory": {
+  "kv_tokens": {
+   "baseline_k2": 352256,
+   "patched_k2": 346298,
+   "production_k4_prob": 309739
+  },
+  "int8_draft_head_gb": 1.27,
+  "gpu_memory_utilization": 0.72
+ },
+ "quality": {
+  "needle": [
+   [
+    28414,
+    0.3,
+    true
+   ],
+   [
+    28415,
+    0.85,
+    true
+   ],
+   [
+    75778,
+    0.5,
+    true
+   ]
+  ],
+  "api_matrix": {
+   "auth_cases": 8,
+   "auth_pass": 8,
+   "endpoints_pass": [
+    "messages",
+    "count_tokens",
+    "thinking",
+    "tool_use",
+    "vision",
+    "effort low/medium/high/xhigh/max"
+   ]
+  },
+  "claude_code_e2e": {
+   "turns": 2,
+   "tests_written": 22,
+   "tests_passing": 22
+  }
+ },
+ "tunnel_recovery": {
+  "_note": "Fake client issuing one authenticated request every ~2.2 s through the launcher; the tunnel's ssh process was killed at t=17 s. Watchdog log: reconnect started at t=20 s; first request after it succeeded at t=21 s.",
+  "t_s": [
+   0,
+   2,
+   5,
+   7,
+   9,
+   11,
+   13,
+   15,
+   17,
+   19,
+   21,
+   24,
+   26,
+   28,
+   30,
+   32,
+   34,
+   36,
+   38,
+   41,
+   43,
+   45,
+   47,
+   49,
+   51,
+   53,
+   56,
+   58,
+   60,
+   62
+  ],
+  "ok": [
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   0,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1
+  ],
+  "kill_t_s": 17,
+  "reconnect_t_s": 20
+ }
+}

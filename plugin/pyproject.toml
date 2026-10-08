@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwen-fastpath"
+version = "0.1.0"
+description = "vLLM plugin: single-user decode fast paths for Qwen3.8-27B W8A8-INT8 on NVIDIA A100 (split-KV GQA-packed spec-decode attention, W8A16 decode GEMM, int8 MTP draft head)"
+requires-python = ">=3.10"
+dependencies = ["vllm==0.31.0", "triton"]
+
+[project.entry-points."vllm.general_plugins"]
+qwen_fastpath = "qwen_fastpath:register"
+
+[tool.setuptools]
+packages = ["qwen_fastpath"]
